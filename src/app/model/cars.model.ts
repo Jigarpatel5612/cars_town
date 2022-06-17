@@ -57,7 +57,7 @@ export class CarModel {
 	public rto: string;
 	public transmission: string;
 	public insurance: string;
-	public insurance_date: string;
+	public insurance_date: any;
 	public color: string;
 	public images: any;
 	public price: any;

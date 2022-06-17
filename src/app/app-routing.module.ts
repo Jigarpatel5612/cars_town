@@ -19,6 +19,7 @@ const routes: Routes = [
 	{ path: 'brands', component: BrandsComponent },
 	{ path: 'login', component: LoginComponent },
 	{ path: 'admin/car-list', component: CarListComponent },
+	{ path: 'edit-cars/:id', component: AddCarsComponent },
 	{ path: 'add-cars', component: AddCarsComponent },
 ];
 

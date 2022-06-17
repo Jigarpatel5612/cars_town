@@ -1,4 +1,6 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { BrandModalModel, BrandModel, BrandVariantModel, CarModel } from 'src/app/model/cars.model';
 import { CarsService } from 'src/Shared/Services/cars.service';
@@ -16,7 +18,8 @@ export class AddCarsComponent implements OnInit {
 	constructor(
 		public service: CarsService,
 		public commonService: CommonService,
-		private toastr: ToastrService
+		private toastr: ToastrService,
+		private route: ActivatedRoute,
 	) { }
 
 	public listOfYears: any[] = [];
@@ -28,12 +31,13 @@ export class AddCarsComponent implements OnInit {
 	public brandModalModel: BrandModalModel = new BrandModalModel();
 	public brandVariantModel: BrandVariantModel = new BrandVariantModel();
 	public carModel: CarModel = new CarModel();
-	public careImagefiles: File[] = [];
+	public carImagefiles: File[] = [];
 	public fuelTypeList: any[] = [];
 	public ownershipList: any[] = [];
 	public RTOList: any[] = [];
 	public transmissionList: any[] = [];
 	public insuranceList: any[] = [];
+	public carID: any;
 
 	ngOnInit(): void {
 		this.getAllBrand();
@@ -45,8 +49,37 @@ export class AddCarsComponent implements OnInit {
 		this.RTOList = this.commonService.RTOList;
 		this.transmissionList = this.commonService.transmissionList;
 		this.insuranceList = this.commonService.insuranceList;
+		this.route.params.subscribe(params => {
+			this.carID = +params['id'];
+		});
+
+		if (this.carID) {
+			this.getCar();
+		}
 	}
 
+	async getCar() {
+		await this.service.GetCar(this.carID).then(res => {
+			if (res.status) {
+				this.carModel = res.data;
+				this.carImagefiles = [];
+				const images: any = res.data.images || [];
+				if (images && images.length > 0) {
+					images.forEach((elementURL: any) => {
+						this.getBase64ImageFromUrl(elementURL).then((result: any) =>
+							this.carImagefiles.push(result))
+							.catch(err => console.error(err));
+					});
+				}
+
+				const insuranceDate = new DatePipe('en-US').transform(res.data.insurance_date, 'yyyy-MM-dd')
+				this.carModel.insurance_date = insuranceDate;
+			} else {
+				this.toastr.error(res.message, 'Error!');
+			}
+		})
+
+	}
 	async getAllBrand() {
 		await this.service.GetAllBrand().then(res => {
 			if (res.status) {
@@ -77,7 +110,6 @@ export class AddCarsComponent implements OnInit {
 				this.toastr.error(res.message, 'Error!');
 			}
 		})
-
 	}
 
 	async doClickAddBrand() {
@@ -203,13 +235,13 @@ export class AddCarsComponent implements OnInit {
 		const formData: any = new FormData();
 		// const formDataImages = new FormData();
 		// const imageFiles: any[] = [];
-		// if (this.careImagefiles && this.careImagefiles.length > 0) {
-		// 	for (let i = 0; i < this.careImagefiles.length; i++) {
-		// 		formDataImages.append(i.toString(), this.careImagefiles[i]);
+		// if (this.carImagefiles && this.carImagefiles.length > 0) {
+		// 	for (let i = 0; i < this.carImagefiles.length; i++) {
+		// 		formDataImages.append(i.toString(), this.carImagefiles[i]);
 		// 		imageFiles.push(formDataImages.getAll(i.toString()));
 		// 	}
 		// }
-		for (let file of this.careImagefiles) {
+		for (let file of this.carImagefiles) {
 			formData.append('images[]', file);
 		}
 
@@ -232,7 +264,7 @@ export class AddCarsComponent implements OnInit {
 			if (res.status) {
 				this.toastr.success(res.message, 'Success!');
 				this.carModel = new CarModel();
-				this.careImagefiles = [];
+				this.carImagefiles = [];
 			} else {
 				this.toastr.error(res.message, 'Error!');
 			}
@@ -293,7 +325,7 @@ export class AddCarsComponent implements OnInit {
 			this.toastr.info('Color is required !', 'Info!');
 			return false;
 		}
-		if (!this.careImagefiles) {
+		if (!this.carImagefiles) {
 			this.toastr.info('Car Images is required !', 'Info!');
 			return false;
 		}
@@ -311,12 +343,29 @@ export class AddCarsComponent implements OnInit {
 	//#region  car multiple image upload 
 	onSelectImage(event: any) {
 		console.log(event);
-		this.careImagefiles.push(...event.addedFiles);
+		this.carImagefiles.push(...event.addedFiles);
 	}
 
 	onRemoveImage(event: any) {
 		console.log(event);
-		this.careImagefiles.splice(this.careImagefiles.indexOf(event), 1);
+		this.carImagefiles.splice(this.carImagefiles.indexOf(event), 1);
+	}
+
+	async getBase64ImageFromUrl(imageUrl: any) {
+		var res = await fetch(imageUrl, { mode: 'no-cors' });
+		var blob = await res.blob();
+
+		return new Promise((resolve, reject) => {
+			var reader = new FileReader();
+			reader.addEventListener("load", function () {
+				resolve(reader.result);
+			}, false);
+
+			reader.onerror = () => {
+				return reject();
+			};
+			reader.readAsDataURL(blob);
+		})
 	}
 	//#endregion
 }
