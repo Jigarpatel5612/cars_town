@@ -5,6 +5,11 @@ import { ToastrService } from 'ngx-toastr';
 import { BrandModalModel, BrandModel, BrandVariantModel, CarModel } from 'src/app/model/cars.model';
 import { CarsService } from 'src/Shared/Services/cars.service';
 import { CommonService } from 'src/Shared/Services/common.service';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { DomSanitizer } from '@angular/platform-browser';
+
 // import { fileDialog } from 'file-dialog'
 @Component({
 	selector: 'app-add-cars',
@@ -20,6 +25,8 @@ export class AddCarsComponent implements OnInit {
 		public commonService: CommonService,
 		private toastr: ToastrService,
 		private route: ActivatedRoute,
+		private http: HttpClient,
+		protected sanitizer: DomSanitizer
 	) { }
 
 	public listOfYears: any[] = [];
@@ -66,10 +73,34 @@ export class AddCarsComponent implements OnInit {
 				const images: any = res.data.images || [];
 				if (images && images.length > 0) {
 					images.forEach((elementURL: any) => {
-						this.getBase64ImageFromUrl(elementURL).then((result: any) =>
-							this.carImagefiles.push(result))
-							.catch(err => console.error(err));
+						// 	this.getBase64ImageFromUrl(elementURL).then((result: any) => {
+						// 		const imgArr = elementURL.split('/');
+						// 		const fileImage = new File([result], imgArr[imgArr.length - 1], { type: 'image/png' });
+						// 		this.carImagefiles.push(fileImage);
+						// 		//this.carImagefiles.push(result)
+						// 	}).catch((err: any) => console.error(err));
+						// this.http
+						// 	.get(
+						// 		elementURL,
+						// 		{ responseType: 'blob' },
+						// 	)
+						// 	.pipe(switchMap((blob: Blob) => this.convertBlobToBase64(blob)))
+						// 	.subscribe((base64ImageUrl: any) => {
+						// 		const imgArr = elementURL.split('/');
+						// 		const fileImage = new File([base64ImageUrl], imgArr[imgArr.length - 1], { type: 'image/png' });
+						// 		this.carImagefiles.push(fileImage);
+						// 	});
+						this.http.get(elementURL, { responseType: 'blob' })
+							.pipe(switchMap((blob: Blob) => this.convertBlobToBase64(blob, elementURL)))
+							.subscribe((base64ImageUrl: any) => {
+								const imgArr = elementURL.split('/');
+								const imageFile: any = new File([base64ImageUrl], imgArr[imgArr.length - 1], { type: 'image/jpeg' });
+								// let imageArray: any = [];
+								// imageArray.push(imageFile)
+								this.carImagefiles.push(imageFile);
+							});
 					});
+
 				}
 
 				const insuranceDate = new DatePipe('en-US').transform(res.data.insurance_date, 'yyyy-MM-dd')
@@ -351,21 +382,38 @@ export class AddCarsComponent implements OnInit {
 		this.carImagefiles.splice(this.carImagefiles.indexOf(event), 1);
 	}
 
-	async getBase64ImageFromUrl(imageUrl: any) {
-		var res = await fetch(imageUrl, { mode: 'no-cors' });
-		var blob = await res.blob();
 
-		return new Promise((resolve, reject) => {
-			var reader = new FileReader();
-			reader.addEventListener("load", function () {
-				resolve(reader.result);
-			}, false);
-
-			reader.onerror = () => {
-				return reject();
+	convertBlobToBase64(blob: Blob, elementURL: any) {
+		return Observable.create((observer: any) => {
+			const reader = new FileReader();
+			const binaryString = reader.readAsDataURL(blob);
+			reader.onload = (event: any) => {
+				console.log('Image in Base64: ', event.target.result);
+				// const imgArr = elementURL.split('/');
+				// const imageName = imgArr[imgArr.length - 1];
+				// const imageBlob = this.dataURItoBlob(event.target.result.toString());
+				// const imageFile = new File([imageBlob], imageName, { type: 'image/png' });
+				observer.next(event.target.result.toString());
+				observer.complete();
 			};
-			reader.readAsDataURL(blob);
-		})
+
+			reader.onerror = (event: any) => {
+				console.log('File could not be read: ' + event.target.error.code);
+				observer.next(event.target.error.code);
+				observer.complete();
+			};
+		});
+	}
+
+	dataURItoBlob(dataURI: any) {
+		const byteString = atob(dataURI);
+		const arrayBuffer = new ArrayBuffer(byteString.length);
+		const int8Array = new Uint8Array(arrayBuffer);
+		for (let i = 0; i < byteString.length; i++) {
+			int8Array[i] = byteString.charCodeAt(i);
+		}
+		const blob = new Blob([int8Array], { type: 'image/png' });
+		return blob;
 	}
 	//#endregion
 }
